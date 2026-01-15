@@ -30,8 +30,8 @@ class Phone(Field):
 class Birthday(Field):
     def __init__(self, value):
         try:
-            birthday_date = datetime.strptime(value, "%d.%m.%Y")
-            super().__init__(birthday_date)
+            datetime.strptime(value, "%d.%m.%Y")
+            super().__init__(value)
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY")
 
@@ -75,7 +75,7 @@ class Record:
 
     def __str__(self):
         phones_str = "; ".join([phone.value for phone in self.phones])
-        birthday_str = f", birthday: {self.birthday.value.strftime('%d.%m.%Y')}" if self.birthday else ""
+        birthday_str = f", birthday: {self.birthday.value}" if self.birthday else ""
         return f"Contact name: {self.name.value}, phones: {phones_str}{birthday_str}"
 
 
@@ -101,7 +101,7 @@ class AddressBook(UserDict):
             if not record.birthday:
                 continue
             
-            birthday_date = record.birthday.value.date()
+            birthday_date = datetime.strptime(record.birthday.value, "%d.%m.%Y").date()
             birthday_this_year = birthday_date.replace(year=today.year)
             
             if birthday_this_year < today:
@@ -138,8 +138,16 @@ def input_error(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except (ValueError, IndexError, KeyError) as e:
+        except ValueError as e:
+            if "not enough values to unpack" in str(e):
+                return "Not enough arguments provided."
             return str(e)
+        except IndexError:
+            return "Not enough arguments provided."
+        except KeyError:
+            return "Contact not found."
+        except AttributeError:
+            return "Contact not found."
     return wrapper
 
 
@@ -153,8 +161,6 @@ def parse_input(user_input):
 
 @input_error
 def add_contact(args, book: AddressBook):
-    if len(args) < 2:
-        raise ValueError("Usage: add <name> <phone>")
     name, phone, *_ = args
     record = book.find(name)
     message = "Contact updated."
@@ -162,32 +168,24 @@ def add_contact(args, book: AddressBook):
         record = Record(name)
         book.add_record(record)
         message = "Contact added."
-    if phone:
-        record.add_phone(phone)
+    record.add_phone(phone)
     return message
 
 
 @input_error
 def change_contact(args, book: AddressBook):
-    if len(args) < 3:
-        raise ValueError("Usage: change <name> <old_phone> <new_phone>")
     name, old_phone, new_phone, *_ = args
     record = book.find(name)
-    if record is None:
-        raise ValueError(f"Contact '{name}' not found.")
     record.edit_phone(old_phone, new_phone)
     return "Contact updated."
 
 
 @input_error
 def show_phone(args, book: AddressBook):
-    if len(args) < 1:
-        raise ValueError("Usage: phone <name>")
     name = args[0]
     record = book.find(name)
-    if record is None:
-        raise ValueError(f"Contact '{name}' not found.")
-    return str(record)
+    phones_str = "; ".join([phone.value for phone in record.phones])
+    return phones_str if phones_str else "No phones available."
 
 
 @input_error
@@ -197,27 +195,19 @@ def show_all(book: AddressBook):
 
 @input_error
 def add_birthday(args, book: AddressBook):
-    if len(args) < 2:
-        raise ValueError("Usage: add-birthday <name> <DD.MM.YYYY>")
     name, birthday, *_ = args
     record = book.find(name)
-    if record is None:
-        raise ValueError(f"Contact '{name}' not found.")
     record.add_birthday(birthday)
     return "Birthday added."
 
 
 @input_error
 def show_birthday(args, book: AddressBook):
-    if len(args) < 1:
-        raise ValueError("Usage: show-birthday <name>")
     name = args[0]
     record = book.find(name)
-    if record is None:
-        raise ValueError(f"Contact '{name}' not found.")
     if record.birthday is None:
         return f"No birthday set for '{name}'."
-    return f"{name}'s birthday: {record.birthday.value.strftime('%d.%m.%Y')}"
+    return f"{name}'s birthday: {record.birthday.value}"
 
 
 @input_error
